@@ -42,9 +42,9 @@ fs::path GetDefaultDumperOutputPath()
 #ifdef __NT__
 	return "C:\\Dumper-7\\";
 #else
-	// Dumper-7 is Windows-only. The only way to use it on Linux is through
+	// Dumper-7 is Windows-only. The only way to use it on Linux/macOS is through
 	// a Wine/Proton prefix at an unpredictable path. Leaving the function
-	// here in case Linux support with unified path is added in the future.
+	// here in case Unix support with unified path is added in the future.
 	return {};
 #endif
 }
@@ -143,7 +143,7 @@ bool ParseSDKHeaderWithClang(const fs::path& HeaderPath, bool bForceImport = fal
 
 	if (NumCompilerErrors == -1)
 	{
-		msg("ParseSDKHeaderWithClang: parser not found - is idaclang plugin loaded?\n");
+		msg("ParseSDKHeaderWithClang: parser not found - is the clang parser available (built-in on IDA 9.5+, idaclang on older versions)?\n");
 		return false;
 	}
 
@@ -385,7 +385,7 @@ std::optional<AskForSDKImportResult> AskForSDKImport(EAvailableFoldersStatus Fol
 
 	if (bCppSDKAvailable)
 	{
-		TypeChoices.push_back("idaclang (recommended)");
+		TypeChoices.push_back("clang/idaclang (recommended)");
 		TypeActions.push_back(ETypeSource::Idaclang);
 	}
 
@@ -438,7 +438,8 @@ struct IDAMappingsPlugin : public plugmod_t
 		if (FolderStatus == EAvailableFoldersStatus::None)
 			return false;
 
-		// idaclang is only offered when CppSDK is present which parses SDK.hpp for the types
+		// The clang parser (built-in since 9.5, idaclang before that) is only offered
+		// when CppSDK is present, since it parses SDK.hpp for the types
 		const auto SDKImportDialogueResult = AskForSDKImport(FolderStatus);
 		if (!SDKImportDialogueResult)
 			return false;

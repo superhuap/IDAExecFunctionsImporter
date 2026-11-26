@@ -20,6 +20,25 @@ if(WIN32)
     set(IDA_LIBRARY_CANDIDATES
         "${IDA_SDK_PATH}/lib/x64_win_64/ida.lib"
         "${IDA_SDK_PATH}/lib/x64_win_vc_64/ida.lib")
+elseif(APPLE)
+    # macOS SDKs ship import stubs rather than a real dylib: 9.5+ uses text-based
+    # .tbd files, while 9.2-9.4 ship Mach-O stubs named libida.dylib. The 9.5
+    # stubs are universal (x86_64 + arm64), so either architecture's copy links.
+    set(IDA_MAC_ARCH "arm64")
+    if(CMAKE_OSX_ARCHITECTURES)
+        if(NOT CMAKE_OSX_ARCHITECTURES MATCHES "arm64")
+            set(IDA_MAC_ARCH "x64")
+        endif()
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$")
+        set(IDA_MAC_ARCH "x64")
+    endif()
+
+    set(IDA_LIBRARY_CANDIDATES
+        # 9.5+ ships text-based stubs; 9.2-9.4 ship Mach-O stubs named .dylib.
+        "${IDA_SDK_PATH}/lib/${IDA_MAC_ARCH}_mac_64/libida.tbd"
+        "${IDA_SDK_PATH}/lib/${IDA_MAC_ARCH}_mac_64/libida.dylib"
+        # 9.2 used the *_mac_clang_* directory layout.
+        "${IDA_SDK_PATH}/lib/${IDA_MAC_ARCH}_mac_clang_64/libida.dylib")
 else()
     set(IDA_LIBRARY_CANDIDATES
         "${IDA_SDK_PATH}/lib/x64_linux_64/libida.so"

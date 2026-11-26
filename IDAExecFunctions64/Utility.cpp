@@ -5,6 +5,9 @@
 
 #ifdef __NT__
 #include <Windows.h>
+#elif defined(__MAC__)
+#include <dlfcn.h>
+#include <mach-o/dyld.h>
 #else
 #include <dlfcn.h>
 #include <link.h>
@@ -125,6 +128,18 @@ bool IsValidCodePointer(ea_t Address)
 #ifndef __NT__
 namespace
 {
+#ifdef __MAC__
+	bool MatchesLoadedModuleFileName(const char* ImagePath, std::string_view FileName)
+	{
+		if (!ImagePath || ImagePath[0] == '\0')
+			return false;
+
+		const std::string_view Path(ImagePath);
+		const size_t FileNameStart = Path.find_last_of('/');
+
+		return Path.substr(FileNameStart == std::string_view::npos ? 0 : FileNameStart + 1) == FileName;
+	}
+#else
 	struct LoadedModuleSearch
 	{
 		std::string_view FileName;
@@ -147,6 +162,7 @@ namespace
 		Search.Path = Path;
 		return 1;
 	}
+#endif
 }
 #endif
 
@@ -157,6 +173,27 @@ void* FindLoadedPluginExport(const char* PluginName, const char* SymbolName)
 
 	return Module ? reinterpret_cast<void*>(GetProcAddress(Module, SymbolName)) : nullptr;
 #else
+#ifdef __MAC__
+	// macOS has no dl_iterate_phdr; walk the dyld image list instead.
+	const std::string FileName = std::string(PluginName) + ".dylib";
+	std::string ModulePath;
+
+	const uint32_t ImageCount = _dyld_image_count();
+	for (uint32_t ImageIndex = 0; ImageIndex < ImageCount; ++ImageIndex)
+	{
+		const char* ImagePath = _dyld_get_image_name(ImageIndex);
+		if (MatchesLoadedModuleFileName(ImagePath, FileName))
+		{
+			ModulePath = ImagePath;
+			break;
+		}
+	}
+
+	if (ModulePath.empty())
+		return nullptr;
+
+	void* Module = dlopen(ModulePath.c_str(), RTLD_NOLOAD | RTLD_NOW);
+#else
 	const std::string FileName = std::string(PluginName) + ".so";
 
 	LoadedModuleSearch Search{ FileName, {} };
@@ -164,6 +201,7 @@ void* FindLoadedPluginExport(const char* PluginName, const char* SymbolName)
 		return nullptr;
 
 	void* Module = dlopen(Search.Path.c_str(), RTLD_NOLOAD | RTLD_NOW);
+#endif
 	if (!Module)
 		return nullptr;
 

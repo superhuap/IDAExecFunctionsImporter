@@ -62,6 +62,8 @@ The utility is required for the hierarchy window shown below and is used automat
 - Hex-Rays Decompiler
 - A Dumper-7 output directory containing `CppSDK`, `IDAMappings`, or both
 - `idaclang` when importing types from `CppSDK/SDK.hpp` (recommended)
+  - IDA 9.5+ ships the built-in **clang** parser, which replaces `idaclang` and needs no separate install.
+  - IDA 9.2–9.4 requires the `idaclang` plugin.
 - [IDA-VTable-Utility](https://github.com/RandomStuffFromAI/IDA-VTable-Utility) for inheritance-aware virtual-call handling
 
 ## Installation
@@ -70,10 +72,11 @@ Download the artifact matching your IDA version and OS from the latest GitHub Ac
 
 Copy the plugin binary into the `plugins` directory of your latest IDA installation:
 
-| Platform | Binary                   | Example destination                              |
-| -------- | ------------------------ | ------------------------------------------------ |
-| Windows  | `IDAExecFunctions64.dll` | `C:\Program Files\IDA Professional 9.3\plugins\` |
-| Linux    | `IDAExecFunctions64.so`  | `~/idapro-9.3/plugins/` or `~/.idapro/plugins/`  |
+| Platform | Binary                     | Example destination                                              |
+| -------- | -------------------------- | ---------------------------------------------------------------- |
+| Windows  | `IDAExecFunctions64.dll`   | `C:\Program Files\IDA Professional 9.3\plugins\`                 |
+| Linux    | `IDAExecFunctions64.so`    | `~/idapro-9.3/plugins/` or `~/.idapro/plugins/`                  |
+| macOS    | `IDAExecFunctions64.dylib` | `/Applications/IDA Professional 9.5.app/Contents/MacOS/plugins/` |
 
 Restart IDA after copying the plugin.
 
@@ -83,7 +86,7 @@ Restart IDA after copying the plugin.
 2. Press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>D</kbd> to run the importer.
 3. Select the top-level Dumper-7 output directory containing `CppSDK` and `IDAMappings`.
 4. Choose a type source:
-   - **idaclang** parses `CppSDK/SDK.hpp`.
+   - **clang/idaclang** parses `CppSDK/SDK.hpp`.
    - **Mappings** creates types from the `.idmap` data.
    - **Don't import types** imports names and symbols only.
 5. To recover a native implementation from an exec thunk, place the cursor on the wrapped function call and press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Q</kbd>.
@@ -111,7 +114,7 @@ IDAExecFunctionsImporter/
 +-- IDAExecFunctions64.sln
 ```
 
-Windows can be built through the Visual Studio solution, Linux through CMake.
+Windows can be built through the Visual Studio solution, Linux and macOS through CMake.
 
 ### Visual Studio
 
@@ -146,6 +149,26 @@ cmake --build build --parallel
 `IDA_SDK_PATH` must point at the `src` directory of the SDK and defaults to `IDA-SDK/src`. Pass `-DIDA_SDK_PATH=<path>/src` when the SDK is located elsewhere.
 
 The resulting `build/IDAExecFunctions64.so` is the plugin binary. Copy it into the `plugins` directory of your IDA installation and restart IDA.
+
+### macOS
+
+macOS builds use the same CMake flow as Linux:
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+```
+
+The SDK ships architecture-specific import stubs (`libida.tbd` on 9.5+, `libida.dylib` on 9.2-9.4). CMake picks the stub matching the host architecture; pass `-DCMAKE_OSX_ARCHITECTURES=arm64` or `-DCMAKE_OSX_ARCHITECTURES=x86_64` to cross-build. On 9.5+ the stubs are universal, so setting both produces a universal binary.
+
+The resulting `build/IDAExecFunctions64.dylib` is the plugin binary. Copy it into the `plugins` directory of your IDA installation, for example:
+
+```sh
+cp build/IDAExecFunctions64.dylib \
+  "/Applications/IDA Professional 9.5.app/Contents/MacOS/plugins/"
+```
+
+Restart IDA after copying it. IDA 9.5+ includes the clang parser, so importing types from `CppSDK/SDK.hpp` works on macOS without extra plugins. On IDA 9.2–9.4, install `idaclang` first or choose the **Mappings** type source.
 
 ## `.idmap` V1 record format
 
